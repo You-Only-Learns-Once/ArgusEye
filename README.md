@@ -98,4 +98,3 @@ Licensed under the **MIT License** — you’re free to use, modify, and distrib
 
 ---
 
-Would you like me to make it **slightly more “showcase-style”** (with badges like “Made with ❤️ by” and model version tags) for better GitHub presentation?
