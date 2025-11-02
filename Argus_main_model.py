@@ -75,3 +75,75 @@ def draw_box_and_label(frame, label, conf, x1, y1, x2, y2, color=(0, 255, 0)):
     cv2.rectangle(frame, (x1, y1 - th - 6), (x1 + tw, y1), color, -1)
     cv2.putText(frame, text, (x1, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
+
+import cv2
+from utils_processing import apply_human_mask, estimate_distance, draw_box_and_label
+
+def run_detection(model, source, device, conf_thresh=0.5):
+    cap = cv2.VideoCapture(source)
+    if not cap.isOpened():
+        print(f" Error: Cannot open video source '{source}'")
+        return
+
+    print(" Running segmentation (press 'q' to quit)")
+    frame_center = None
+
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print(" End of stream or no frame captured.")
+            break
+
+        results = model.predict(frame, conf=conf_thresh, device=device, verbose=False)
+        annotated_frame = frame.copy()
+
+        if frame_center is None:
+            frame_center = (frame.shape[1] // 2, frame.shape[0] // 2)
+
+        cv2.circle(annotated_frame, frame_center, 5, (255, 0, 0), -1)
+        cv2.putText(annotated_frame, "Camera", (frame_center[0] - 30, frame_center[1] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+
+        for result in results:
+            boxes = result.boxes
+            masks = result.masks
+
+            if boxes is None:
+                continue
+
+            for i, box in enumerate(boxes):
+                cls_id = int(box.cls[0])
+                label = model.names[cls_id]
+                conf = float(box.conf[0])
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                bbox_height = y2 - y1
+
+               
+                draw_box_and_label(annotated_frame, label, conf, x1, y1, x2, y2)
+
+             
+                if label.lower() == "person":
+                    if masks is not None:
+                        mask = masks.data[i].cpu().numpy()
+                        annotated_frame = apply_human_mask(annotated_frame, mask)
+
+                    distance = estimate_distance(bbox_height)
+                    person_center = ((x1 + x2) // 2, (y1 + y2) // 2)
+                    cv2.line(annotated_frame, frame_center, person_center, (0, 0, 255), 2)
+                    mid_x = (frame_center[0] + person_center[0]) // 2
+                    mid_y = (frame_center[1] + person_center[1]) // 2
+                    cv2.putText(annotated_frame, f"{distance}m",
+                                (mid_x, mid_y), cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6, (255, 255, 0), 2)
+
+        cv2.imshow("YOLOv8 - Human Distance & Highlight", annotated_frame)
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            print(" Quitting...")
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+    print(" Done! Full human highlighting + distance display complete.")
+
+
