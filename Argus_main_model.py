@@ -43,3 +43,35 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+# packages
+import cv2
+import numpy as np
+
+# Config
+KNOWN_HEIGHT = 170  
+FOCAL_LENGTH = 600  
+
+def apply_human_mask(frame, mask, color=(0, 0, 255), alpha=0.6):
+    mask = cv2.resize(mask, (frame.shape[1], frame.shape[0]))
+    overlay = np.zeros_like(frame, dtype=np.uint8)
+    overlay[:, :] = color
+    mask_area = mask[..., None] > 0.5
+    return np.where(mask_area, cv2.addWeighted(frame, 1 - alpha, overlay, alpha, 0), frame)
+
+def estimate_distance(bbox_height):
+    if bbox_height == 0:
+        return 0
+    distance_cm = (KNOWN_HEIGHT * FOCAL_LENGTH) / bbox_height
+    return round(distance_cm / 100, 2)
+
+def draw_box_and_label(frame, label, conf, x1, y1, x2, y2, color=(0, 255, 0)):
+    cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+    text = f"{label} {conf:.2f}"
+    (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+    cv2.rectangle(frame, (x1, y1 - th - 6), (x1 + tw, y1), color, -1)
+    cv2.putText(frame, text, (x1, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
